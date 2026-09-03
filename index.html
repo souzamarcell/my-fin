@@ -124,6 +124,14 @@ tr.tx-marked-red td{text-decoration:line-through; text-decoration-color:var(--re
 tr.tx-marked-red td:last-child{text-decoration:none;}
 .tx-card.tx-marked-red .left b{text-decoration:line-through; text-decoration-color:var(--red); text-decoration-thickness:2px;}
 .pill{padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; background:var(--surface-2);}
+tr.tx-group-row{cursor:pointer; background:var(--surface-2);}
+tr.tx-group-row:hover td{background:var(--primary-light);}
+tr.tx-group-row td{font-weight:600;}
+tr.tx-group-row .group-caret{font-weight:400; color:var(--text-muted); margin-left:4px;}
+tr.tx-group-detail td:first-child{padding-left:26px; color:var(--text-muted);}
+.tx-card.tx-group-row{cursor:pointer; border:1px dashed var(--border);}
+.tx-card.tx-group-row .left b{font-weight:700;}
+.tx-card.tx-group-detail{margin-left:14px; background:var(--surface);}
 .act-btn{background:none; border:none; font-size:15px; padding:4px 6px; color:var(--text-muted);}
 .act-btn:hover{color:var(--primary);}
 .tx-cards{display:none; flex-direction:column; gap:8px;}
@@ -210,7 +218,7 @@ footer.app-footer a{color:var(--primary); text-decoration:none; font-weight:600;
 <!-- ============ LOGIN ============ -->
 <div id="loginScreen">
   <div class="login-card">
-    <div class="login-logo">My Fin 💲</div>
+    <div class="login-logo">My Fin 💲 v1.0.7</div>
     <div class="login-sub">Controle financeiro pessoal inteligente</div>
     <div class="login-error" id="loginError">Usuário ou senha inválidos.</div>
     <div class="field">
@@ -230,7 +238,7 @@ footer.app-footer a{color:var(--primary); text-decoration:none; font-weight:600;
 <div id="app" class="hidden">
   <div id="overlay" class="hidden" onclick="toggleSidebar(false)"></div>
   <aside id="sidebar">
-    <div class="side-brand">My Fin <span>💲</span></div>
+    <div class="side-brand">My Fin <span>💲</span>v1.0.7</div>
     <nav id="navList"></nav>
   </aside>
 
@@ -1038,11 +1046,63 @@ function txRowClass(t){
   if(t.marcado) cls.push('tx-marked-red');
   return cls.join(' ');
 }
+let expandedTxGroups=new Set();
+function toggleTxGroup(key){
+  if(expandedTxGroups.has(key)) expandedTxGroups.delete(key); else expandedTxGroups.add(key);
+  renderTxTable();
+}
+function txDetailRowHtml(t){
+  return `<tr class="${txRowClass(t)} tx-group-detail">
+    <td>${t.dia}</td><td>${t.transacao}</td><td><span class="pill">${t.grupo}</span></td>
+    <td>${t.parcelaTotal>1? t.parcelaAtual+'/'+t.parcelaTotal+' ('+formatMoney(installmentGroupTotal(t.grupoParcelaId))+')' : '—'}</td>
+    <td class="${t.valor<0?'neg':'blu'}">${formatMoney(t.valor)}</td>
+    <td><button class="act-btn" onclick="event.stopPropagation();editTransaction('${t.id}')">✏️</button><button class="act-btn" onclick="event.stopPropagation();deleteTransaction('${t.id}')">🗑️</button><button class="act-btn" onclick="event.stopPropagation();toggleTransactionActive('${t.id}')" title="${isActive(t)?'Desativar lançamento':'Reativar lançamento'}">${isActive(t)?'🚫':'✅'}</button><button class="act-btn" onclick="event.stopPropagation();toggleTransactionMarked('${t.id}')" title="${t.marcado?'Remover marcação':'Marcar lançamento (visual)'}">${t.marcado?'⚪':'🔴'}</button></td>
+  </tr>`;
+}
+function txDetailCardHtml(t){
+  return `<div class="tx-card ${txRowClass(t)} tx-group-detail">
+    <div class="left"><b>${t.transacao}</b><small>${t.grupo} ${t.parcelaTotal>1?'· '+t.parcelaAtual+'/'+t.parcelaTotal+' ('+formatMoney(installmentGroupTotal(t.grupoParcelaId))+')':''} · dia ${t.dia}</small></div>
+    <div class="right"><div class="${t.valor<0?'neg':'blu'}">${formatMoney(t.valor)}</div>
+    <button class="act-btn" onclick="event.stopPropagation();editTransaction('${t.id}')">✏️</button><button class="act-btn" onclick="event.stopPropagation();deleteTransaction('${t.id}')">🗑️</button><button class="act-btn" onclick="event.stopPropagation();toggleTransactionActive('${t.id}')" title="${isActive(t)?'Desativar lançamento':'Reativar lançamento'}">${isActive(t)?'🚫':'✅'}</button><button class="act-btn" onclick="event.stopPropagation();toggleTransactionMarked('${t.id}')" title="${t.marcado?'Remover marcação':'Marcar lançamento (visual)'}">${t.marcado?'⚪':'🔴'}</button></div></div>`;
+}
 function renderTxTable(){
-  const list=db.transactions.filter(t=>t.ano===curYear&&t.mes===curMonth).sort((a,b)=>a.dia-b.dia);
+  const list=db.transactions.filter(t=>t.ano===curYear&&t.mes===curMonth);
   const acc=calculateAccumulated(curYear,curMonth);
+
+  // Agrupa por grupo
+  const byGroup={};
+  list.forEach(t=>{ (byGroup[t.grupo]=byGroup[t.grupo]||[]).push(t); });
+  const groupedEntries=[]; // grupos com mais de 1 lançamento
+  const singleItems=[]; // lançamentos cujo grupo é único (não agrupados)
+  Object.entries(byGroup).forEach(([grupo,items])=>{
+    if(items.length>1) groupedEntries.push([grupo,items]); else singleItems.push(items[0]);
+  });
+  singleItems.sort((a,b)=>a.dia-b.dia);
+  groupedEntries.sort((a,b)=>a[0].localeCompare(b[0]));
+
   let rows=`<tr class="acc-row"><td>1</td><td>Mês Anterior</td><td>—</td><td>—</td><td class="${acc<0?'acc-neg':''}">${formatMoney(acc)}</td><td>—</td></tr>`;
-  rows+=list.map(t=>`<tr class="${txRowClass(t)}">
+  let cardsHtml=`<div class="tx-card"><div class="left"><b>Mês Anterior</b><small>Saldo acumulado</small></div><div class="right ${acc<0?'neg':'blu'}">${formatMoney(acc)}</div></div>`;
+
+  groupedEntries.forEach(([grupo,items])=>{
+    const sum=items.reduce((s,t)=>s+t.valor,0);
+    const key='g_'+grupo;
+    const expanded=expandedTxGroups.has(key);
+    const itemsOrdenados=items.slice().sort((a,b)=>a.dia-b.dia);
+
+    rows+=`<tr class="tx-group-row" onclick="toggleTxGroup('${key}')">
+      <td>—</td><td colspan="2"><span class="pill">${grupo}</span> <span class="group-caret">${items.length} itens ${expanded?'▲':'▼'}</span></td>
+      <td>—</td><td class="${sum<0?'neg':'blu'}">${formatMoney(sum)}</td><td>—</td>
+    </tr>`;
+    if(expanded) rows+=itemsOrdenados.map(txDetailRowHtml).join('');
+
+    cardsHtml+=`<div class="tx-card tx-group-row" onclick="toggleTxGroup('${key}')">
+      <div class="left"><b>${grupo}</b><small>${items.length} itens ${expanded?'▲':'▼'}</small></div>
+      <div class="right ${sum<0?'neg':'blu'}">${formatMoney(sum)}</div>
+    </div>`;
+    if(expanded) cardsHtml+=itemsOrdenados.map(txDetailCardHtml).join('');
+  });
+
+  rows+=singleItems.map(t=>`<tr class="${txRowClass(t)}">
     <td>${t.dia}</td><td>${t.transacao}</td><td><span class="pill">${t.grupo}</span></td>
     <td>${t.parcelaTotal>1? t.parcelaAtual+'/'+t.parcelaTotal+' ('+formatMoney(installmentGroupTotal(t.grupoParcelaId))+')' : '—'}</td>
     <td class="${t.valor<0?'neg':'blu'}">${formatMoney(t.valor)}</td>
@@ -1050,8 +1110,7 @@ function renderTxTable(){
   </tr>`).join('');
   document.getElementById('txTableBody').innerHTML=rows;
 
-  let cardsHtml=`<div class="tx-card"><div class="left"><b>Mês Anterior</b><small>Saldo acumulado</small></div><div class="right ${acc<0?'neg':'blu'}">${formatMoney(acc)}</div></div>`;
-  cardsHtml+=list.map(t=>`<div class="tx-card ${txRowClass(t)}">
+  cardsHtml+=singleItems.map(t=>`<div class="tx-card ${txRowClass(t)}">
     <div class="left"><b>${t.transacao}</b><small>${t.grupo} ${t.parcelaTotal>1?'· '+t.parcelaAtual+'/'+t.parcelaTotal+' ('+formatMoney(installmentGroupTotal(t.grupoParcelaId))+')':''} · dia ${t.dia}</small></div>
     <div class="right"><div class="${t.valor<0?'neg':'blu'}">${formatMoney(t.valor)}</div>
     <button class="act-btn" onclick="editTransaction('${t.id}')">✏️</button><button class="act-btn" onclick="deleteTransaction('${t.id}')">🗑️</button><button class="act-btn" onclick="toggleTransactionActive('${t.id}')" title="${isActive(t)?'Desativar lançamento':'Reativar lançamento'}">${isActive(t)?'🚫':'✅'}</button><button class="act-btn" onclick="toggleTransactionMarked('${t.id}')" title="${t.marcado?'Remover marcação':'Marcar lançamento (visual)'}">${t.marcado?'⚪':'🔴'}</button></div></div>`).join('');
