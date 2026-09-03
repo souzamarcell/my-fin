@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
 :root{
   --radius:14px; --radius-sm:9px;
@@ -53,14 +55,15 @@ a{color:inherit;}
 
 /* ---------- APP SHELL ---------- */
 #app{min-height:100vh; display:flex;}
-#sidebar{position:fixed; top:0; left:0; width:250px; height:100vh; background:var(--surface); border-right:1px solid var(--border); z-index:60; transform:translateX(-100%); transition:transform .25s ease; display:flex; flex-direction:column; overflow-y:auto;}
+#sidebar{position:fixed; top:0; left:0; width:250px; height:100vh; background:var(--surface); border-right:1px solid var(--border); z-index:60; transform:translateX(-100%); transition:transform .25s ease, width .2s ease; display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden;}
 #sidebar.open{transform:translateX(0);}
-.side-brand{padding:22px 20px; font-family:var(--font-display); font-weight:800; font-size:19px; border-bottom:1px solid var(--border);}
+.side-brand{padding:22px 20px; font-family:var(--font-display); font-weight:800; font-size:19px; border-bottom:1px solid var(--border); white-space:nowrap;}
 .side-brand span{color:var(--primary);}
-.nav-item{display:flex; align-items:center; gap:11px; padding:12px 20px; font-size:14px; font-weight:500; color:var(--text-muted); border-left:3px solid transparent;}
+.side-brand .brand-icon{display:none; text-align:center; font-size:22px;}
+.nav-item{display:flex; align-items:center; gap:11px; padding:12px 20px; font-size:14px; font-weight:500; color:var(--text-muted); border-left:3px solid transparent; white-space:nowrap;}
 .nav-item:hover{background:var(--surface-2); color:var(--text);}
 .nav-item.active{color:var(--primary); border-left-color:var(--primary); background:var(--primary-light);}
-.nav-icon{width:20px; text-align:center; font-size:16px;}
+.nav-icon{width:20px; text-align:center; font-size:16px; flex:none;}
 #overlay{position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:55;}
 
 #mainWrap{flex:1; min-width:0;}
@@ -86,6 +89,7 @@ a{color:inherit;}
 #content{padding:20px; max-width:1280px; margin:0 auto; width:100%;}
 .view-title{font-family:var(--font-display); font-size:21px; font-weight:700; margin-bottom:16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
 .view-title .muted{font-size:12.5px; color:var(--text-muted); font-weight:500;}
+#btnExportPdf{padding:8px 14px; font-size:12.5px; white-space:nowrap;}
 
 .cards-row{display:flex; gap:14px; overflow-x:auto; padding-bottom:4px; margin-bottom:16px;}
 .stat-card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; min-width:168px; flex:1; box-shadow:var(--shadow);}
@@ -210,6 +214,13 @@ footer.app-footer a{color:var(--primary); text-decoration:none; font-weight:600;
   #sidebar{transform:translateX(0); position:sticky; top:0;}
   #overlay{display:none !important;}
   #app{display:flex;}
+  #sidebar.collapsed{width:68px;}
+  #sidebar.collapsed .side-brand{padding:22px 0;}
+  #sidebar.collapsed .side-brand .brand-full{display:none;}
+  #sidebar.collapsed .side-brand .brand-icon{display:block;}
+  #sidebar.collapsed .nav-item{justify-content:center; padding:12px 0;}
+  #sidebar.collapsed .nav-item .nav-label{display:none;}
+  #sidebar.collapsed .nav-icon{font-size:19px;}
 }
 </style>
 </head>
@@ -238,17 +249,17 @@ footer.app-footer a{color:var(--primary); text-decoration:none; font-weight:600;
 <div id="app" class="hidden">
   <div id="overlay" class="hidden" onclick="toggleSidebar(false)"></div>
   <aside id="sidebar">
-    <div class="side-brand">My Fin <span>💲</span>v1.0.7</div>
+    <div class="side-brand"><span class="brand-full">My Fin <span>💲</span>v1.0.7</span><span class="brand-icon">💲</span></div>
     <nav id="navList"></nav>
   </aside>
 
   <div id="mainWrap">
     <header id="topbar">
-      <button id="hamburgerBtn" onclick="toggleSidebar()" aria-label="Abrir menu">☰</button>
+      <button id="hamburgerBtn" onclick="handleHamburgerClick()" aria-label="Abrir/encolher menu">☰</button>
       <div class="topbar-title" id="topbarTitle">Dashboard</div>
       <div class="topbar-spacer"></div>
       <div class="promo-slot" onclick="window.open('https://wa.me/5519997808689','_blank')" title="Fale conosco no WhatsApp">
-        <span>📣</span><span id="promoText">Sua Empresa Aqui!</span>
+        <span>📣</span><span id="promoText">Marcell queria patrocinar o My Fin. Vamos conversar?</span>
       </div>
       <button class="icon-btn" onclick="toggleTheme()" id="themeBtn" aria-label="Alternar tema">🌙</button>
       <div class="profile-pic" id="profilePic" onclick="window.open('http://www.linkedin.com/in/marcellsouza','_blank')" title="LinkedIn de Marcell Souza">💲</div>
@@ -262,7 +273,7 @@ footer.app-footer a{color:var(--primary); text-decoration:none; font-weight:600;
 
       <!-- DASHBOARD -->
       <section id="view-dashboard">
-        <div class="view-title">🏠 Dashboard <span class="muted" id="dashSub"></span></div>
+        <div class="view-title">🏠 Dashboard <span class="muted" id="dashSub"></span><span class="topbar-spacer"></span><button class="btn btn-outline" id="btnExportPdf" onclick="exportMonthPDF()">📄 Exportar PDF do mês</button></div>
 
         <div class="cards-row">
           <div class="stat-card"><div class="stat-label">Saldo do Ano</div><div class="stat-value" id="cardSaldoAno">R$ 0,00</div></div>
@@ -595,7 +606,7 @@ function initDemoData(){
   db={ transactions:[], transactionTypes:[],
     categories:[],
     users:[{username:'admin',password:'123'}],
-    settings:{theme:'light',firstDayOfWeek:'dom',dateFormat:'DD/MM/YYYY',tickerEnabled:true,tickerSpeed:'normal'},
+    settings:{theme:'light',firstDayOfWeek:'dom',dateFormat:'DD/MM/YYYY',tickerEnabled:true,tickerSpeed:'normal',sidebarCollapsed:true},
     auditLogs:[], goals:[] };
 }
 
@@ -627,8 +638,8 @@ function doLogout(){
 ============================================================ */
 function buildNav(){
   const nav=document.getElementById('navList');
-  nav.innerHTML=NAV_ITEMS.map(it=>`<a href="#" class="nav-item" data-view="${it.id}" onclick="goView('${it.id}');return false;"><span class="nav-icon">${it.icon}</span>${it.label}</a>`).join('')
-    + `<a href="#" class="nav-item" onclick="confirmLogout();return false;"><span class="nav-icon">🚪</span>Sair</a>`;
+  nav.innerHTML=NAV_ITEMS.map(it=>`<a href="#" class="nav-item" data-view="${it.id}" title="${it.label}" onclick="goView('${it.id}');return false;"><span class="nav-icon">${it.icon}</span><span class="nav-label">${it.label}</span></a>`).join('')
+    + `<a href="#" class="nav-item" title="Sair" onclick="confirmLogout();return false;"><span class="nav-icon">🚪</span><span class="nav-label">Sair</span></a>`;
 }
 function goView(id){
   document.querySelectorAll('#app > div [id^="view-"], #mainWrap [id^="view-"]').forEach(s=>s.hidden=true);
@@ -651,6 +662,20 @@ function toggleSidebar(force){
   const open = force!==undefined? force : !sb.classList.contains('open');
   sb.classList.toggle('open', open);
   ov.classList.toggle('hidden', !open || window.innerWidth>=960);
+}
+function toggleSidebarCollapse(force){
+  const sb=document.getElementById('sidebar');
+  const collapsed = force!==undefined? force : !sb.classList.contains('collapsed');
+  sb.classList.toggle('collapsed', collapsed);
+  db.settings.sidebarCollapsed = collapsed;
+  saveDatabase();
+}
+function handleHamburgerClick(){
+  if(window.innerWidth>=960) toggleSidebarCollapse();
+  else toggleSidebar();
+}
+function applySidebarCollapse(){
+  if(window.innerWidth>=960) toggleSidebarCollapse(db.settings.sidebarCollapsed !== false);
 }
 function confirmLogout(){
   showConfirm('Deseja realmente sair do My Fin?', [
@@ -1116,6 +1141,134 @@ function renderTxTable(){
     <button class="act-btn" onclick="editTransaction('${t.id}')">✏️</button><button class="act-btn" onclick="deleteTransaction('${t.id}')">🗑️</button><button class="act-btn" onclick="toggleTransactionActive('${t.id}')" title="${isActive(t)?'Desativar lançamento':'Reativar lançamento'}">${isActive(t)?'🚫':'✅'}</button><button class="act-btn" onclick="toggleTransactionMarked('${t.id}')" title="${t.marcado?'Remover marcação':'Marcar lançamento (visual)'}">${t.marcado?'⚪':'🔴'}</button></div></div>`).join('');
   document.getElementById('txCardsBody').innerHTML=cardsHtml;
 }
+function exportMonthPDF(){
+  if(!(window.jspdf && window.jspdf.jsPDF)){
+    showNotification('Não foi possível carregar o gerador de PDF. Verifique sua conexão.', 'error');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({orientation:'p', unit:'pt', format:'a4'});
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const nomeMes = MESES[curMonth];
+
+  const list = db.transactions.filter(t=>t.ano===curYear && t.mes===curMonth).sort((a,b)=>a.dia-b.dia);
+  const acc = calculateAccumulated(curYear, curMonth);
+  const saldoMes = calculateMonthBalance(curYear, curMonth) + acc;
+  const receitaMes = db.transactions.filter(t=>t.ano===curYear&&t.mes===curMonth&&t.valor>0&&isActive(t)).reduce((s,t)=>s+t.valor,0);
+  const despesaMes = db.transactions.filter(t=>t.ano===curYear&&t.mes===curMonth&&t.valor<0&&isActive(t)).reduce((s,t)=>s+Math.abs(t.valor),0);
+  const mediaMes = despesaMes/Math.max(1, elapsedDaysMonth(curYear, curMonth));
+
+  // Cabeçalho
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  doc.setTextColor(15,157,99);
+  doc.text('M y F i n', 40, 44);
+  doc.setTextColor(20,30,50); doc.setFontSize(12);
+  doc.text(`Relatório de Lançamentos — ${nomeMes} / ${curYear}`, 40, 62);
+  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(110,120,135);
+  doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`, 40, 76);
+
+  // Resumo
+  const resumo = [
+    ['Saldo do mês', formatMoney(saldoMes)],
+    ['Créditos do mês', formatMoney(receitaMes)],
+    ['Débitos do mês', formatMoney(despesaMes)],
+    ['Gasto diário médio', formatMoney(mediaMes)],
+  ];
+  doc.autoTable({
+    startY: 90,
+    theme: 'plain',
+    styles:{ font:'helvetica', fontSize:10, cellPadding:{top:3,bottom:3,left:0,right:6} },
+    columnStyles:{0:{fontStyle:'bold', textColor:[91,107,124]}, 1:{halign:'right'}},
+    body: resumo,
+    margin:{left:40,right:40},
+    didParseCell: (data)=>{
+      if(data.section==='body' && data.column.index===1){
+        const raw = data.cell.raw;
+        const isVermelho = data.row.index===2 || data.row.index===3; // "Débitos do mês" e "Gasto diário médio"
+        if(isVermelho || (typeof raw==='string' && raw.trim().startsWith('-'))) data.cell.styles.textColor=[229,72,77];
+      }
+    }
+  });
+
+  // Resumo por grupo
+  const porGrupo={};
+  list.forEach(t=>{ porGrupo[t.grupo]=(porGrupo[t.grupo]||0)+t.valor; });
+  const grupoRows=Object.entries(porGrupo).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).map(([g,v])=>[g, formatMoney(v)]);
+  let nextY = doc.lastAutoTable.finalY + 16;
+  if(grupoRows.length){
+    doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(20,30,50);
+    doc.text('Totais por grupo', 40, nextY);
+    doc.autoTable({
+      startY: nextY+8,
+      head: [['Grupo','Total']],
+      body: grupoRows,
+      theme:'striped',
+      headStyles:{ fillColor:[15,157,99], textColor:255, fontSize:10 },
+      styles:{ fontSize:9.5, cellPadding:5 },
+      columnStyles:{1:{halign:'right'}},
+      margin:{left:40,right:40},
+      didParseCell: (data)=>{
+        if(data.section==='body' && data.column.index===1){
+          const raw = data.cell.raw;
+          if(typeof raw==='string' && raw.trim().startsWith('-')) data.cell.styles.textColor=[229,72,77];
+        }
+      }
+    });
+    nextY = doc.lastAutoTable.finalY + 18;
+  }
+
+  // Detalhamento de lançamentos (sempre começa em uma nova página)
+  doc.addPage();
+  const startYDetail = 50;
+  doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(20,30,50);
+  doc.text('Lançamentos detalhados', 40, startYDetail);
+
+  const body = [['1','Mês anterior','—','—', formatMoney(acc)]];
+  list.forEach(t=>{
+    const parcela = t.parcelaTotal>1 ? `${t.parcelaAtual}/${t.parcelaTotal}` : '—';
+    body.push([
+      String(t.dia),
+      t.transacao + (isActive(t)?'':' (inativo)'),
+      t.grupo,
+      parcela,
+      formatMoney(t.valor)
+    ]);
+  });
+
+  doc.autoTable({
+    startY: startYDetail+8,
+    head: [['Dia','Transação','Grupo','Parcela','Valor']],
+    body,
+    theme:'grid',
+    headStyles:{ fillColor:[15,157,99], textColor:255, fontSize:9.5 },
+    styles:{ fontSize:9, cellPadding:5, overflow:'linebreak' },
+    columnStyles:{ 0:{cellWidth:34, halign:'center'}, 3:{cellWidth:55, halign:'center'}, 4:{cellWidth:80, halign:'right'} },
+    margin:{left:40,right:40},
+    didParseCell: (data)=>{
+      if(data.section==='body' && data.column.index===4){
+        const raw = data.cell.raw;
+        if(typeof raw==='string' && raw.trim().startsWith('-')) data.cell.styles.textColor=[229,72,77];
+      }
+    }
+  });
+
+  const finalY = doc.lastAutoTable.finalY + 10;
+  doc.setFontSize(8.5); doc.setTextColor(140,150,165);
+  doc.text('My Fin — Controle Financeiro Pessoal', 40, Math.min(finalY, doc.internal.pageSize.getHeight()-20));
+
+  // Numeração de páginas (rodapé, lado direito)
+  const totalPaginas = doc.internal.getNumberOfPages();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  for(let p=1; p<=totalPaginas; p++){
+    doc.setPage(p);
+    doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(140,150,165);
+    doc.text(`Página ${p} de ${totalPaginas}`, pageWidth-40, pageHeight-20, {align:'right'});
+  }
+
+  doc.save(`MyFin_${nomeMes}_${curYear}.pdf`);
+  addAuditLog('EXPORTAÇÃO','Dashboard',`Relatório de ${nomeMes}/${curYear} exportado em PDF`, `${curYear}-${curMonth}`);
+  showNotification('PDF do mês exportado com sucesso.', 'success');
+}
 function toggleTransactionActive(id){
   const t=db.transactions.find(x=>x.id===id);
   if(!t) return;
@@ -1472,6 +1625,7 @@ function boot(){
   buildNav();
   renderTicker();
   goView('dashboard');
+  applySidebarCollapse();
   showNotification('Bem-vindo ao My Fin 💲','info');
 }
 loadDatabase();
